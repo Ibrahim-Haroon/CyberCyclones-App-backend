@@ -1,3 +1,7 @@
 .venv
 .idea
 local-config.env
+*.DS_Store
+src/db.sqlite3
+*__pycache__*
+dump.rdb
