@@ -1,0 +1,67 @@
+services:
+  cyber-cyclones-backend:
+    image: emoji-cyber-cyclones-backend:latest
+    container_name: cyber-cyclones-server
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - postgres
+    env_file:
+      - local-config.env
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: redis-stack-server
+    ports:
+      - "6379:6379"
+    stdin_open: true
+    tty: true
+    expose:
+      - "6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    container_name: inventory-pg-store
+    image: postgres
+    hostname: inventory-pg-store
+    ports:
+      - "5432:5432"
+    env_file:
+      - local-config.env
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./pgdata:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    depends_on:
+      - postgres
+    ports:
+      - "5050:80"
+    env_file:
+      - local-config.env
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  pgadmin-data:
