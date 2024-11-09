@@ -21,8 +21,6 @@ class Skin(models.Model):
     available = models.BooleanField(default=True)
     description = models.TextField()
 
-    objects = models.Manager()
-
     class Meta:
         db_table = 'skins'
         indexes = [
