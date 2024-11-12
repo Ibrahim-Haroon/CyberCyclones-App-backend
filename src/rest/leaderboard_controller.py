@@ -8,15 +8,16 @@ from src.rest.dto.global_leaderboard_dto import GlobalLeaderboardDto
 from src.rest.dto.nearby_ranking_dto import NearbyRankingDto
 from src.rest.dto.user_ranking_dto import UserRankingDto
 from src.rest.dto.weekly_leaderboard_dto import WeeklyLeaderboardDto
-from src.service.leaderboard_service import LeaderboardService
+from src.service_module import ServiceModule
 
 
 class LeaderboardController(viewsets.ViewSet):
     base_route = "api/v1/leaderboard"
 
-    def __init__(self, leaderboard_service: LeaderboardService, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.leaderboard_service = leaderboard_service
+        __service_module = ServiceModule()
+        self.leaderboard_service = __service_module.leaderboard_service
 
     @action(detail=False, methods=['GET'])
     def global_rankings(self, request) -> Response:

@@ -1,3 +1,4 @@
+import base64
 from typing import List
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -9,15 +10,16 @@ from src.rest.dto.popular_discovery_dto import PopularDiscoveryDto
 from src.rest.dto.scan_discovery_dto import ScanDiscoveryDto
 from src.rest.dto.scan_discovery_request_dto import ScanDiscoveryRequestDto
 from src.rest.dto.undiscovered_item_dto import UndiscoveredItemDto
-from src.service.discovery_service import DiscoveryService
+from src.service_module import ServiceModule
 
 
 class DiscoveryController(viewsets.ViewSet):
     base_route = "api/v1/discoveries"
 
-    def __init__(self, discovery_service: DiscoveryService, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.discovery_service = discovery_service
+        __service_module = ServiceModule()
+        self.discovery_service = __service_module.discovery_service
 
     @action(detail=False, methods=['POST'])
     def scan(self, request) -> Response:
@@ -26,10 +28,14 @@ class DiscoveryController(viewsets.ViewSet):
         Process a new discovery from image scan
         """
         try:
-            scan_request: ScanDiscoveryRequestDto = request.data
+            image_file = request.FILES.get('image')
+            if not image_file:
+                raise ValidationError("No image provided")
+
+            encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
             discovery_result: ScanDiscoveryDto = self.discovery_service.process_discovery(
                 user_id=request.user.id,
-                item_name=scan_request['image']
+                encoded_image=encoded_image
             )
             return Response(discovery_result, status=status.HTTP_200_OK)
         except ValidationError as e:

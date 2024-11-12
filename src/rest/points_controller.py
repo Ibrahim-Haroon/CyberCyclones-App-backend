@@ -4,20 +4,21 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-from src.service.points_service import PointsService
 from src.rest.dto.points_summary_dto import PointsSummaryDto
 from src.rest.dto.points_history_dto import PointsHistoryDto
 from src.rest.dto.points_breakdown_dto import PointsBreakdownDto
 from src.rest.dto.points_deduction_dto import PointsDeductionDto
 from src.rest.dto.points_deduction_request_dto import PointsDeductionRequestDto
+from src.service_module import ServiceModule
 
 
 class PointsController(viewsets.ViewSet):
     base_route = "api/v1/points"
 
-    def __init__(self, points_service: PointsService, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.points_service = points_service
+        __service_module = ServiceModule()
+        self.points_service = __service_module.points_service
 
     @action(detail=False, methods=['GET'], permission_classes=[IsAuthenticated])
     def summary(self, request) -> Response:

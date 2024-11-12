@@ -3,18 +3,19 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-from src.service.user_service import UserService
 from src.rest.dto.user_profile_dto import UserProfileDto
 from src.rest.dto.update_display_name_dto import UpdateDisplayNameDto
 from src.rest.dto.update_dsiplay_name_request_dto import UpdateDisplayNameRequestDto
+from src.service_module import ServiceModule
 
 
 class UserController(viewsets.ViewSet):
     base_route = "api/v1/users"
 
-    def __init__(self, user_service: UserService, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.user_service = user_service
+        __service_module = ServiceModule()
+        self.user_service = __service_module.user_service
 
     @action(detail=False, methods=['GET'], permission_classes=[IsAuthenticated])
     def profile(self, request) -> Response:
