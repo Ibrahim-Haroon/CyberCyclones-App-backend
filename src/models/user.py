@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.core.validators import MinValueValidator
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.auth.base_user import BaseUserManager
+from django.contrib.auth.hashers import make_password, is_password_usable
 
 
 class UserManager(BaseUserManager):
@@ -19,7 +20,7 @@ class UserManager(BaseUserManager):
             email=self.normalize_email(email),
             **extra_fields
         )
-        user.set_password(password)
+        user.password = make_password(password)
         user.save(using=self._db)
         return user
 
@@ -41,6 +42,12 @@ class User(AbstractBaseUser):
 
     USERNAME_FIELD = 'username'  # field to use for auth
     REQUIRED_FIELDS = ['email']
+
+    def save(self, *args, **kwargs):
+        # Hash password if it's not already hashed (is_password_usable returns False for hashed passwords)
+        if self.password is not None and not is_password_usable(self.password):
+            self.password = make_password(self.password)
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'users'
