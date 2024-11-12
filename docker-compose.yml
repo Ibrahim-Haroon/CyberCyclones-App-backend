@@ -1,6 +1,6 @@
 services:
   cyber-cyclones-backend:
-    image: emoji-cyber-cyclones-backend:latest
+    image: cyber-cyclones-backend:latest
     container_name: cyber-cyclones-server
     build: .
     ports:
