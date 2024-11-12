@@ -11,7 +11,7 @@ RUN apt-get update && \
         flac \
         ffmpeg
 
-COPY requirements.txt .
+COPY requirements_pip.txt .
 
 RUN pip install -r requirements_pip.txt
 
