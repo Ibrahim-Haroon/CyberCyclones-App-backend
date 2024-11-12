@@ -1,4 +1,6 @@
 import logging
+
+from django.contrib.auth.hashers import check_password
 from rest_framework_simplejwt.tokens import RefreshToken
 from src.models.user import User
 from typing import Tuple
@@ -17,13 +19,15 @@ class AuthService:
         Authenticate user and return user object with JWT token
         Returns tuple of (user, token)
         """
-        # Verify credentials
-        if not self.__user_repository.verify_password(username, password):
-            self.logger.info(f"Login failed for user: {username}")
+        user = self.__user_repository.find_by_username(username)
+        if not user:
+            self.logger.info(f"Login failed - user not found: {username}")
             raise ValidationError("Invalid credentials")
 
-        # Get user
-        user = self.__user_repository.find_by_username(username)
+        if not check_password(password, user.password):
+            self.logger.info(f"Login failed - invalid password for user: {username}")
+            raise ValidationError("Invalid credentials")
+
         if not user.is_active:
             self.logger.info(f"Login attempt for inactive user: {username}")
             raise ValidationError("Account is deactivated")
