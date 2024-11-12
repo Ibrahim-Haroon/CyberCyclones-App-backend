@@ -1,5 +1,8 @@
+import base64
 from typing import List
 from django.db.models import Sum
+from src.llm.llm_provider_factory import LLMProviderFactory
+from src.llm.llm_type import LlmType
 from src.models.items import Item
 from django.db.models import Count
 from datetime import datetime, timedelta
@@ -14,7 +17,7 @@ class DiscoveryService:
         self.__user_repository = user_repository
         self.__points_service = points_service
 
-    def process_discovery(self, user_id: int, item_name: str) -> dict:
+    def process_discovery(self, user_id: int, encoded_image: base64) -> dict:
         """
         Process a new item discovery for a user
         Returns discovery details including points awarded
@@ -23,7 +26,12 @@ class DiscoveryService:
         if not user:
             raise ValidationError("User not found")
 
-        # Find item by name (from LLM identification)
+        try:
+            openai_llm = LLMProviderFactory.get_provider(LlmType.OPENAI)
+            item_name = openai_llm.get_message(encoded_image)
+        except Exception as e:
+            raise ValidationError(f"Error processing image: {str(e)}")
+
         try:
             item = Item.objects.get(name__iexact=item_name)
         except Item.DoesNotExist:
