@@ -1,4 +1,5 @@
 import base64
+import logging
 from typing import List
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -12,9 +13,9 @@ from src.rest.dto.scan_discovery_request_dto import ScanDiscoveryRequestDto
 from src.rest.dto.undiscovered_item_dto import UndiscoveredItemDto
 from src.service_module import ServiceModule
 
-
 class DiscoveryController(viewsets.ViewSet):
     base_route = "api/v1/discoveries"
+    logger = logging.getLogger(__name__)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -40,6 +41,12 @@ class DiscoveryController(viewsets.ViewSet):
             return Response(discovery_result, status=status.HTTP_200_OK)
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            self.logger.error(f"Unexpected error during scan: {str(e)}")
+            return Response(
+                {"error": "An unexpected error occurred processing your request"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=['GET'])
     def history(self, request) -> Response:
