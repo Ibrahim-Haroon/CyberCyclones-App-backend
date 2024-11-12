@@ -1,8 +1,14 @@
+from typing import List
+from datetime import datetime, timedelta
 from src.models.user import User
 from src.models.items import Item
 from django.core.exceptions import ValidationError
 from src.models.user_discoveries import UserDiscovery
 from src.repository.user_repository import UserRepository
+from src.rest.dto.points_breakdown_dto import PointsBreakdownDto
+from src.rest.dto.points_history_dto import PointsHistoryDto
+from django.db.models import Sum, Count, Avg, QuerySet
+from django.db.models.functions import Trunc, ExtractHour, TruncDate
 
 
 class PointsService:
@@ -96,6 +102,127 @@ class PointsService:
         }
 
     @staticmethod
+    def get_points_history(user_id: int, timeframe: str) -> List[PointsHistoryDto]:
+        """
+        Get points history for a specific timeframe ('week', 'month', or 'year')
+        """
+        # Get user's discoveries within timeframe
+        from_date = {
+            'week': datetime.now() - timedelta(days=7),
+            'month': datetime.now() - timedelta(days=30),
+            'year': datetime.now() - timedelta(days=365)
+        }[timeframe]
+
+        discoveries = UserDiscovery.objects.filter(
+            user_id=user_id,
+            discovered_at__gte=from_date
+        )
+
+        # Group points by appropriate time unit
+        group_by = {
+            'week': 'day',  # Daily breakdown for week
+            'month': 'week',  # Weekly breakdown for month
+            'year': 'month'  # Monthly breakdown for year
+        }[timeframe]
+
+        points_over_time = discoveries.annotate(
+            period=Trunc('discovered_at', group_by)
+        ).values('period').annotate(
+            points=Sum('points_awarded'),
+            discoveries=Count('id')
+        ).order_by('period')
+
+        return [{
+            "period": entry['period'],
+            "points_earned": entry['points'],
+            "discoveries_count": entry['discoveries'],
+            "average_points_per_discovery": round(
+                entry['points'] / entry['discoveries'], 2
+            ) if entry['discoveries'] > 0 else 0
+        } for entry in points_over_time]
+
+    def get_points_breakdown(self, user_id: int) -> PointsBreakdownDto:
+        """
+        Get detailed breakdown of how points were earned
+        """
+        discoveries = UserDiscovery.objects.filter(user_id=user_id)
+
+        # Breakdown by item category
+        category_breakdown = discoveries.values(
+            'item__category'
+        ).annotate(
+            total_points=Sum('points_awarded'),
+            count=Count('id'),
+            avg_points=Avg('points_awarded')
+        )
+
+        # Breakdown by item rarity
+        rarity_breakdown = discoveries.values(
+            'item__rarity'
+        ).annotate(
+            total_points=Sum('points_awarded'),
+            count=Count('id'),
+            avg_points=Avg('points_awarded')
+        )
+
+        # Time-based patterns
+        time_patterns = discoveries.annotate(
+            hour=ExtractHour('discovered_at')
+        ).values('hour').annotate(
+            total_points=Sum('points_awarded'),
+            count=Count('id')
+        ).order_by('hour')
+
+        # Calculate streaks
+        daily_discoveries = discoveries.annotate(
+            date=TruncDate('discovered_at')
+        ).values('date').distinct()
+
+        current_streak = self.__calculate_current_streak(daily_discoveries)
+        longest_streak = self.__calculate_longest_streak(daily_discoveries)
+
+        return {
+            "total_discoveries": discoveries.count(),
+            "total_points": discoveries.aggregate(
+                total=Sum('points_awarded')
+            )['total'] or 0,
+            "category_breakdown": {
+                item['item__category']: {
+                    "points": item['total_points'],
+                    "count": item['count'],
+                    "average_points": round(item['avg_points'], 2)
+                } for item in category_breakdown
+            },
+            "rarity_breakdown": {
+                item['item__rarity']: {
+                    "points": item['total_points'],
+                    "count": item['count'],
+                    "average_points": round(item['avg_points'], 2)
+                } for item in rarity_breakdown
+            },
+            "time_patterns": {
+                item['hour']: {
+                    "points": item['total_points'],
+                    "discoveries": item['count']
+                } for item in time_patterns
+            },
+            "engagement_stats": {
+                "current_streak": current_streak,
+                "longest_streak": longest_streak,
+                "daily_average_points": round(
+                    discoveries.aggregate(
+                        avg=Avg('points_awarded')
+                    )['avg'] or 0,
+                    2
+                ),
+                "most_productive_hour": max(
+                    time_patterns,
+                    key=lambda x: x['total_points']
+                )['hour'] if time_patterns else None
+            }
+        }
+
+    @staticmethod
     def __calculate_points_for_item(item: Item) -> int:
         """Calculate points for discovering an item based on its properties"""
         # Base points from item's point_value
@@ -131,6 +258,45 @@ class PointsService:
         # Update if rank changed
         if new_rank != old_rank:
             self.__user_repository.update_rank(user.id, new_rank)
+
+    @staticmethod
+    def __calculate_current_streak(
+            daily_discoveries: QuerySet
+    ) -> int:
+        """Calculate current consecutive days streak"""
+        dates = [
+            d['date'] for d in daily_discoveries.order_by('-date')
+        ]
+        if not dates:
+            return 0
+
+        streak = 1
+        for i in range(len(dates) - 1):
+            if (dates[i] - dates[i + 1]).days == 1:
+                streak += 1
+            else:
+                break
+        return streak
+
+    @staticmethod
+    def __calculate_longest_streak(
+            daily_discoveries: QuerySet
+    ) -> int:
+        """Calculate longest consecutive days streak"""
+        dates = [
+            d['date'] for d in daily_discoveries.order_by('date')
+        ]
+        if not dates:
+            return 0
+
+        max_streak = current_streak = 1
+        for i in range(len(dates) - 1):
+            if (dates[i + 1] - dates[i]).days == 1:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 1
+        return max_streak
 
     @staticmethod
     def __get_next_rank_info(user: User) -> dict:
