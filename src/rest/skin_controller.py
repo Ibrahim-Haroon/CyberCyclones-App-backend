@@ -1,6 +1,5 @@
 from typing import List
 from src.rest.dto.skin_dto import SkinDto
-from src.service.skin_service import SkinService
 from src.rest.dto.owned_skin_dto import OwnedSkinDto
 from src.rest.dto.skin_equip_dto import SkinEquipDto
 from src.rest.dto.skin_stats_dto import SkinStatsDto
@@ -9,14 +8,16 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
+from src.service_module import ServiceModule
 
 
 class SkinController(viewsets.ViewSet):
     base_route = "api/v1/skins"
 
-    def __init__(self, skin_service: SkinService, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.skin_service = skin_service
+        __service_module = ServiceModule()
+        self.skin_service = __service_module.skin_service
 
     @action(detail=False, methods=['GET'])
     def available(self, request) -> Response:

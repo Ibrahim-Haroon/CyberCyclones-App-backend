@@ -1,3 +1,4 @@
+import logging
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -11,15 +12,17 @@ from src.rest.dto.password_reset_dto import PasswordResetDto
 from src.rest.dto.password_reset_request_dto import PasswordResetRequestDto
 from src.rest.dto.register_user_dto import RegisterUserDto
 from src.rest.dto.register_user_request_dto import RegisterUserRequestDto
-from src.service.auth_service import AuthService
+from src.service_module import ServiceModule
 
 
 class AuthController(viewsets.ViewSet):
     base_route = "api/v1/auth"
+    logger = logging.getLogger(__name__)
 
-    def __init__(self, auth_service: AuthService, **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.auth_service = auth_service
+        __service_module = ServiceModule()
+        self.auth_service = __service_module.auth_service
 
     @action(detail=False, methods=['POST'])
     def register(self, request) -> Response:
@@ -29,15 +32,33 @@ class AuthController(viewsets.ViewSet):
         """
         try:
             register_request: RegisterUserRequestDto = request.data
-            user_data: RegisterUserDto = self.auth_service.register(
+            user, token = self.auth_service.register(
                 username=register_request['username'],
                 email=register_request['email'],
                 password=register_request['password'],
                 display_name=register_request.get('display_name')  # Optional
             )
+
+            user_data: RegisterUserDto = {
+                "user_id": user.id,
+                "username": user.username,
+                "display_name": user.display_name,
+                "email": user.email,
+                "token": token,
+                "created_at": user.created_at.isoformat()
+            }
+
+            self.logger.info(f"User registered: {user_data['username']}")
             return Response(user_data, status=status.HTTP_201_CREATED)
         except ValidationError as e:
+            self.logger.info(f"Registration failed: {str(e)}")
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            self.logger.info(f"An unexpected error occurred during registration: {str(e)}")
+            return Response(
+                {"error": f"An unexpected error occurred during registration: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=['POST'])
     def login(self, request) -> Response:
@@ -47,10 +68,20 @@ class AuthController(viewsets.ViewSet):
         """
         try:
             login_request: LoginRequestDto = request.data
-            login_data: LoginDto = self.auth_service.login(
+            user, token = self.auth_service.login(
                 username=login_request['username'],
                 password=login_request['password']
             )
+
+            login_data: LoginDto = {
+                "user_id": user.id,
+                "username": user.username,
+                "display_name": user.display_name,
+                "token": token,
+                "points_balance": user.points_balance,
+                "rank_title": user.rank_title
+            }
+
             return Response(login_data, status=status.HTTP_200_OK)
         except ValidationError as e:
             return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
