@@ -6,10 +6,10 @@ from src.llm.llm_type import LlmType
 from src.models.items import Item
 from django.db.models import Count
 from datetime import datetime, timedelta
-from django.core.exceptions import ValidationError
 from src.service.points_service import PointsService
 from src.models.user_discoveries import UserDiscovery
 from src.repository.user_repository import UserRepository
+from rest_framework.exceptions import ValidationError
 
 
 class DiscoveryService:
@@ -24,22 +24,22 @@ class DiscoveryService:
         """
         user = self.__user_repository.find_by_id(user_id)
         if not user:
-            raise ValidationError("User not found")
+            raise ValidationError({"detail": "User not found"})
 
         try:
             openai_llm = LLMProviderFactory.get_provider(LlmType.OPENAI)
             item_name = openai_llm.get_message(encoded_image)
         except Exception as e:
-            raise ValidationError(f"Error processing image: {str(e)}")
+            raise ValidationError({"detail": f"Error processing image: {str(e)}"})
 
         try:
             item = Item.objects.get(name__iexact=item_name)
         except Item.DoesNotExist:
-            raise ValidationError(f"Item '{item_name}' not recognized in our database")
+            raise ValidationError({"detail": f"Item '{item_name}' not recognized in our database"})
 
         # Check for existing discovery
         if UserDiscovery.objects.filter(user_id=user_id, item_id=item.id).exists():
-            raise ValidationError("You have already discovered this item")
+            raise ValidationError({"detail": f"You have already discovered {item_name}"})
 
         # Award points and record discovery
         points_awarded, new_total = self.__points_service.award_points_for_discovery(user_id, item)
