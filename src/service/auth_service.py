@@ -1,17 +1,16 @@
-import jwt
+import logging
+from rest_framework_simplejwt.tokens import RefreshToken
 from src.models.user import User
-from django.conf import settings
-from typing import Optional, Tuple
-from datetime import datetime, timedelta
+from typing import Tuple
 from django.core.exceptions import ValidationError
 from src.repository.user_repository import UserRepository
 
 
 class AuthService:
+    logger = logging.getLogger(__name__)
+
     def __init__(self, user_repository: UserRepository):
         self.__user_repository = user_repository
-        self.__jwt_secret = settings.SECRET_KEY
-        self.__token_expiry = timedelta(days=1)  # 24 hour tokens
 
     def login(self, username: str, password: str) -> Tuple[User, str]:
         """
@@ -20,39 +19,21 @@ class AuthService:
         """
         # Verify credentials
         if not self.__user_repository.verify_password(username, password):
+            self.logger.info(f"Login failed for user: {username}")
             raise ValidationError("Invalid credentials")
 
         # Get user
         user = self.__user_repository.find_by_username(username)
         if not user.is_active:
+            self.logger.info(f"Login attempt for inactive user: {username}")
             raise ValidationError("Account is deactivated")
 
         # Update last login
         self.__user_repository.update_last_login(user.id)
-        # Generate token
-        token = self.__generate_token(user)
 
-        return user, token
-
-    def verify_token(self, token: str) -> Optional[User]:
-        """Verify JWT token and return associated user"""
-        try:
-            payload = jwt.decode(token, self.__jwt_secret, algorithms=["HS256"])
-
-            # Check token expiry
-            exp = datetime.fromtimestamp(payload['exp'])
-            if datetime.now() > exp:
-                return None
-
-            # Get and verify user
-            user = self.__user_repository.find_by_id(payload['user_id'])
-            if not user or not user.is_active:
-                return None
-
-            return user
-
-        except jwt.InvalidTokenError:
-            return None
+        # Generate token using Simple JWT
+        refresh = RefreshToken.for_user(user)
+        return user, str(refresh.access_token)
 
     def register(self, username: str, email: str, password: str, display_name: str = None) -> Tuple[User, str]:
         """
@@ -69,10 +50,10 @@ class AuthService:
             password=password,
             display_name=display_name
         )
-        # Generate token
-        token = self.__generate_token(user)
 
-        return user, token
+        # Generate token using Simple JWT
+        refresh = RefreshToken.for_user(user)
+        return user, str(refresh.access_token)  # Using access_token instead of refresh token
 
     def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
         """Change user's password"""
@@ -83,58 +64,52 @@ class AuthService:
         # Verify old password
         if not self.__user_repository.verify_password(user.username, old_password):
             raise ValidationError("Current password is incorrect")
+
         # Validate new password strength
         self.__validate_password_strength(new_password)
+
         # Update password
         self.__user_repository.update_password(user_id, new_password)
         return True
 
-    def generate_password_reset_token(self, email: str) -> Optional[str]:
-        """Generate password reset token"""
+    def reset_password_request(self, email: str) -> RefreshToken:
+        """
+        Request a password reset token using Simple JWT
+        Returns a refresh token that can be used for password reset
+        """
         user = self.__user_repository.find_by_email(email)
         if not user:
-            return None  # Don't reveal if email exists
+            self.logger.info(f"Password reset attempted for non-existent email: {email}")
+            raise ValidationError("If this email exists, a reset link will be sent")
 
-        # Generate short-lived token (2 hours)
-        payload = {
-            'user_id': user.id,
-            'purpose': 'password_reset',
-            'exp': datetime.now() + timedelta(hours=2)
-        }
-        return jwt.encode(payload, self.__jwt_secret, algorithm="HS256")
+        # Generate token with shorter expiry
+        token = RefreshToken.for_user(user)
+        # You could customize the token payload here if needed
+        token['purpose'] = 'password_reset'
+
+        return token
 
     def reset_password(self, token: str, new_password: str) -> bool:
         """Reset password using reset token"""
         try:
-            payload = jwt.decode(token, self.__jwt_secret, algorithms=["HS256"])
+            # Validate token
+            refresh = RefreshToken(token)
+            user_id = refresh['user_id']
 
-            # Verify it's a password reset token
-            if payload.get('purpose') != 'password_reset':
+            # Check if it's a password reset token
+            if refresh.get('purpose') != 'password_reset':
                 raise ValidationError("Invalid reset token")
-
-            # Check expiry
-            exp = datetime.fromtimestamp(payload['exp'])
-            if datetime.now() > exp:
-                raise ValidationError("Reset token has expired")
 
             # Validate new password
             self.__validate_password_strength(new_password)
 
             # Update password
-            self.__user_repository.update_password(payload['user_id'], new_password)
+            self.__user_repository.update_password(user_id, new_password)
             return True
 
-        except jwt.InvalidTokenError:
-            raise ValidationError("Invalid reset token")
-
-    def __generate_token(self, user: User) -> str:
-        """Generate JWT token for user"""
-        payload = {
-            'user_id': user.id,
-            'username': user.username,
-            'exp': datetime.now() + self.__token_expiry
-        }
-        return jwt.encode(payload, self.__jwt_secret, algorithm="HS256")
+        except Exception as e:
+            self.logger.error(f"Password reset failed: {str(e)}")
+            raise ValidationError("Invalid or expired reset token")
 
     @staticmethod
     def __validate_password_strength(password: str) -> None:
