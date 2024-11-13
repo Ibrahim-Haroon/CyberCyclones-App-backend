@@ -1,6 +1,7 @@
 from typing import List
 from src.models.user import User
-from datetime import datetime, timedelta
+from datetime import timedelta
+from django.utils import timezone
 from django.db.models.functions import Rank
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Sum, Window, F
@@ -35,7 +36,7 @@ class LeaderboardService:
     @staticmethod
     def get_weekly_leaderboard(limit: int = 10) -> List[dict]:
         """Get weekly leaderboard based on points earned in the last 7 days"""
-        week_ago = datetime.now() - timedelta(days=7)
+        week_ago = timezone.now() - timedelta(days=7)
 
         # Get points earned from discoveries in last week
         weekly_points = (
@@ -100,7 +101,7 @@ class LeaderboardService:
         global_rank = self.__user_repository.get_user_rank_position(user_id)
 
         # Get weekly points
-        week_ago = datetime.now() - timedelta(days=7)
+        week_ago = timezone.now() - timedelta(days=7)
         weekly_points = UserDiscovery.objects.filter(
             user_id=user_id,
             discovered_at__gte=week_ago

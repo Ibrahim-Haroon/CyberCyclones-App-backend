@@ -1,5 +1,6 @@
 from typing import List
-from datetime import datetime, timedelta
+from datetime import timedelta
+from django.utils import timezone
 from src.models.user import User
 from src.models.items import Item
 from django.core.exceptions import ValidationError
@@ -108,9 +109,9 @@ class PointsService:
         """
         # Get user's discoveries within timeframe
         from_date = {
-            'week': datetime.now() - timedelta(days=7),
-            'month': datetime.now() - timedelta(days=30),
-            'year': datetime.now() - timedelta(days=365)
+            'week': timezone.now() - timedelta(days=7),
+            'month': timezone.now() - timedelta(days=30),
+            'year': timezone.now() - timedelta(days=365)
         }[timeframe]
 
         discoveries = UserDiscovery.objects.filter(
