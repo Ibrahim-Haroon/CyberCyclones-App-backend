@@ -3,7 +3,7 @@ from src.models.user import User
 from datetime import timedelta
 from django.utils import timezone
 from django.db.models.functions import Rank
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from django.db.models import Count, Sum, Window, F
 from src.models.user_discoveries import UserDiscovery
 from src.repository.user_repository import UserRepository

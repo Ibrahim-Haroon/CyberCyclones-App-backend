@@ -1,10 +1,9 @@
 import logging
-
 from django.contrib.auth.hashers import check_password
 from rest_framework_simplejwt.tokens import RefreshToken
 from src.models.user import User
 from typing import Tuple
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from src.repository.user_repository import UserRepository
 
 

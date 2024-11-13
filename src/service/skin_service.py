@@ -3,7 +3,7 @@ from src.models.skin import Skin
 from django.db import transaction
 from django.db.models import Count, Sum
 from src.models.user_skins import UserSkin
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from src.service.points_service import PointsService
 from src.repository.user_repository import UserRepository
 

@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.utils import timezone
 from src.models.user import User
 from src.models.items import Item
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from src.models.user_discoveries import UserDiscovery
 from src.repository.user_repository import UserRepository
 from src.rest.dto.points_breakdown_dto import PointsBreakdownDto
