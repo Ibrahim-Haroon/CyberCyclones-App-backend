@@ -5,7 +5,8 @@ from src.llm.llm_provider_factory import LLMProviderFactory
 from src.llm.llm_type import LlmType
 from src.models.items import Item
 from django.db.models import Count
-from datetime import datetime, timedelta
+from datetime import timedelta
+from django.utils import timezone
 from src.service.points_service import PointsService
 from src.models.user_discoveries import UserDiscovery
 from src.repository.user_repository import UserRepository
@@ -91,7 +92,7 @@ class DiscoveryService:
         )
         # Recent discoveries
         recent_discoveries = discoveries.filter(
-            discovered_at__gte=datetime.now() - timedelta(days=7)
+            discovered_at__gte=timezone.now() - timedelta(days=7)
         ).count()
 
         return {
