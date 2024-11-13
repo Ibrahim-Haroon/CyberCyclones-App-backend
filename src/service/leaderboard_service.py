@@ -18,14 +18,14 @@ class LeaderboardService:
         leaderboard = User.objects.filter(
             is_active=True
         ).annotate(
-            rank=Window(
+            leaderboard_rank=Window(
                 expression=Rank(),
                 order_by=F('total_points_earned').desc()
             )
-        ).order_by('rank')[:limit]
+        ).order_by('leaderboard_rank')[:limit]
 
         return [{
-            "rank": entry.rank,
+            "rank": entry.leaderboard_rank,
             "username": entry.username,
             "display_name": entry.display_name,
             "total_points": entry.total_points_earned,
@@ -139,16 +139,16 @@ class LeaderboardService:
         nearby_users = User.objects.filter(
             is_active=True
         ).annotate(
-            rank=Window(
+            leaderboard_rank=Window(
                 expression=Rank(),
                 order_by=F('total_points_earned').desc()
             )
         ).filter(
             rank__range=(max(1, user_rank - range), user_rank + range)
-        ).order_by('rank')
+        ).order_by('leaderboard_rank')
 
         return [{
-            "rank": user.rank,
+            "rank": user.leaderboard_rank,
             "username": user.username,
             "display_name": user.display_name,
             "total_points": user.total_points_earned,
